@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package message.v1;
+
+option go_package = "github.com/FeeRro/messenger_app/gen/message/v1;messagev1";
+
+import "google/protobuf/timestamp.proto";
+
+// MessageService accepts a message, assigns id/seq, persists it, and publishes to Kafka.
+service MessageService {
+  rpc Send(SendRequest)       returns (SendResponse);
+  rpc History(HistoryRequest) returns (HistoryResponse);
+}
+
+message Message {
+  int64  id        = 1;
+  int64  chat_id   = 2;
+  int64  sender_id = 3;
+  // seq is a monotonic per-chat sequence number. Clients sort and dedup by it
+  // instead of relying on time (clocks drift).
+  int64  seq       = 4;
+  string content   = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message SendRequest {
+  int64  chat_id   = 1;
+  int64  sender_id = 2; // Gateway fills this from the verified JWT
+  string content   = 3;
+  // Idempotency: client generates a uuid and resends it on retries.
+  // The service dedups by it — otherwise a retry creates a duplicate message.
+  string client_msg_id = 4;
+}
+
+message SendResponse {
+  int64 message_id = 1;
+  int64 seq        = 2;
+}
+
+message HistoryRequest {
+  int64 chat_id = 1;
+  // Cursor pagination: "give messages with seq less than before_seq".
+  // NOT offset/limit — on an append-heavy feed the offset drifts.
+  int64 before_seq = 2;
+  int32 limit      = 3;
+}
+
+message HistoryResponse {
+  repeated Message messages = 1;
+  bool has_more = 2;
+}

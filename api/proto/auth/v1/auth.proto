@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package auth.v1;
+
+// go_package: where buf writes generated Go code and the package alias.
+// Format "path;name" — path is relative to the module in go.mod.
+option go_package = "github.com/FeeRro/messenger_app/gen/auth/v1;authv1";
+
+import "google/protobuf/timestamp.proto";
+
+// AuthService is the only service that ISSUES tokens (signs with the private key).
+// The Gateway only verifies tokens with the public key and does not call here per request.
+service AuthService {
+  // Register by phone. In production this would include an OTP step;
+  // for the learning project we simplify to "phone + name -> user".
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // Login -> token pair (short-lived access, long-lived refresh).
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // Refresh the access token using the refresh token, no re-login.
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+}
+
+message RegisterRequest {
+  string phone_number = 1;
+  string name         = 2;
+}
+
+message RegisterResponse {
+  int64 user_id = 1;
+}
+
+message LoginRequest {
+  string phone_number = 1;
+  // Learning stub: password/code. In production this is a verified OTP.
+  string code         = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+// Reusable type — NOT an RPC response directly, used as a nested field.
+message TokenPair {
+  string access_token             = 1;
+  string refresh_token            = 2;
+  google.protobuf.Timestamp access_expires_at = 3;
+}
+
+// Dedicated response per RPC: lets each method add fields independently.
+message LoginResponse {
+  TokenPair tokens = 1;
+}
+
+message RefreshResponse {
+  TokenPair tokens = 1;
+}
