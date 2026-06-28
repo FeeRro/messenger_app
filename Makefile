@@ -1,10 +1,24 @@
 include .env
 export
 
-export PROJECT_ROOT=${shell pwd}
+export PROJECT_ROOT=$(shell pwd)
+
+tools:
+	@go install github.com/bufbuild/buf/cmd/buf@latest
+	@go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+proto-lint:
+	@buf lint api/proto
+
+proto:
+	@buf generate
+
+proto-breaking:
+	@buf breaking api/proto --against '.git#branch=main,subdir=api/proto'
 
 env-up:
-	@docker compose up -d postgres
+	@docker compose up -d postgres redis kafka
 
 env-down:
 	@docker compose down
@@ -13,17 +27,17 @@ env-cleanup:
 	@docker compose down -v
 
 env-logs:
-	@docker compose logs -f postgres
+	@docker compose logs -f postgres redis kafka
 
 migrate-create:
-	if [ -z "$(seq)]; then \
-		echo: "Error: Environment variable SEQ is not set. Example: make migrate-create seq=1"; \
+	@if [ -z "$(seq)" ]; then \
+		echo "Error: Environment variable seq is not set. Example: make migrate-create seq=1"; \
 		exit 1; \
 	fi; \
-	docer compose run --rm migrate create \
+	docker compose run --rm --user "$(shell id -u):$(shell id -g)" migrate create \
 		-ext sql \
 		-dir /migrations \
-		-seq "$(SEQ)"
+		-seq "$(seq)"
 
 migrate-up:
 	@make migrate-action action=up

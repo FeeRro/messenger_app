@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+# Cancel stale runs on the same branch/PR to save runner minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  proto:
+    name: proto (lint + breaking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # buf breaking compares against main -> needs history, not a shallow clone.
+          fetch-depth: 0
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ github.token }}
+
+      # Contract style: naming, numbering, required *_UNSPECIFIED, etc.
+      - name: Lint
+        run: buf lint api/proto
+
+      # Guard against breaking contract changes relative to main.
+      # Skipped on main itself — nothing to compare against.
+      - name: Breaking changes
+        if: github.ref != 'refs/heads/main'
+        run: buf breaking api/proto --against 'https://github.com/FeeRro/messenger_app.git#branch=main,subdir=api/proto'
